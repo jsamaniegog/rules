@@ -64,11 +64,11 @@ function plugin_pre_item_delete_rules(CommonDBTM $item) {
     $ruleitem->processRules($item, PluginRulesRule::ONDELETE);
 }
 
-function plugin_pre_item_purge_rules(CommonDBTM $item) {
+/*function plugin_pre_item_purge_rules(CommonDBTM $item) {
     $ruleitem = 'PluginRulesRule' . get_class($item);
     $ruleitem = new $ruleitem();
     $ruleitem->processRules($item, PluginRulesRule::ONPURGE);
-}
+}*/
 
 /*function plugin_rule_matched_rules($params) {
     $params['subtype'];

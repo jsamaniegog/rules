@@ -29,6 +29,7 @@ if (!defined('GLPI_ROOT')) {
  *
  * */
 class PluginRulesRule extends Rule {
+
     /**
      * If do history.
      * @var bool 
@@ -78,6 +79,16 @@ class PluginRulesRule extends Rule {
      * Event on purge
      */
     //const ONPURGE = 8;
+
+    /**
+     * For criteria screen
+     */
+    const CRITERIA = 1;
+
+    /**
+     * For action screen
+     */
+    const ACTION = 2;
 
     /**
      * Return the asset of actual class. Based on name.
@@ -164,35 +175,64 @@ class PluginRulesRule extends Rule {
         }
     }
 
-    public function getCriteriasFromObject(CommonDBTM $object) {
+    /**
+     * 
+     * @param CommonDBTM $object
+     * @param type $criteria_or_action See constants.
+     * @return string
+     */
+    public function getCriteriasFromObject(CommonDBTM $object, $criteria_or_action) {
         $criterias = $object->getSearchOptions();
+        
+        // for infocom table
+        $criterias = array_merge($criterias, $this::getInfocomCriterias($object, $criteria_or_action));
 
         foreach ($criterias as $key => $criteria) {
             if (!is_numeric($key)) {
                 unset($criterias[$key]);
+
                 // on actions can't view groups
-                //$criterias_final[$key] = $object->getType() . ' - ' . $key;
+                if ($criteria_or_action == $this::CRITERIA) {
+                    $criterias_final[$key] = $object->getTypeName() . ' - ' . $key;
+                }
+
                 continue;
             }
 
-            if ($criterias[$key]['table'] != $object->getTable()) {
+            // foreing key table
+            if ($criteria['table'] != $object->getTable()) {
+                $sufix = "_id";
+
                 // if it's foreingkey but don't dropdown
-                if ($criterias[$key]['datatype'] != 'dropdown') {
-                    unset($criterias[$key]);
-                    continue;
+                if ($criteria['datatype'] != 'dropdown') {
+                    if ($criteria_or_action == $this::ACTION) {
+                        $sufix = "_" . $criteria['field'];
+                        $item = str_replace("glpi_", "", $criteria['table']);
+                        $item = ucfirst(substr($item, 0, strlen($item) - 1));
+                        if (class_exists($item)) {
+                            $criterias[$key]['name'] = $item::getTypeName(1) . " - " . $criterias[$key]['name'];
+                        } else {
+                            unset($criterias[$key]);
+                            continue;
+                        }
+                    } else {
+                        unset($criterias[$key]);
+                        continue;
+                    }
                 }
 
-                $field = $criterias[$key]['linkfield'] = str_replace("glpi_", "", $criterias[$key]['table']) . "_id";
+                $field = $criterias[$key]['linkfield'] = str_replace("glpi_", "", $criterias[$key]['table']) . $sufix;
+                
             } else {
                 $field = $criterias[$key]['field'];
             }
 
             // the index must be named like the field not a number
             $criterias_final[$field] = $criterias[$key];
-            
+
             // type == datatype
             $criterias_final[$field]['type'] = $criterias[$key]['datatype'];
-            
+
             // unset the number index
             //unset($criterias[$key]);
         }
@@ -200,13 +240,26 @@ class PluginRulesRule extends Rule {
         return $criterias_final;
     }
 
+    /**
+     * Special item infocom for actions.
+     * @param type $criteria_or_action See constants.
+     */
+    static function getInfocomCriterias(CommonDBTM $object, $criteria_or_action) {
+        if ($criteria_or_action == self::ACTION) {
+            $infocom = new Infocom();
+            return $infocom->getSearchOptionsToAdd(get_class($object));
+        }
+        
+        return array();
+    }
+
     function getCriterias() {
         $criterias = array();
 
         $asset = self::getItem();
         $asset = new $asset();
-        $criterias = $this->getCriteriasFromObject($asset);
-        
+        $criterias = $this->getCriteriasFromObject($asset, $this::CRITERIA);
+
         return $criterias;
     }
 
@@ -215,7 +268,7 @@ class PluginRulesRule extends Rule {
 
         $asset = self::getItem();
         $asset = new $asset();
-        $criterias = $this->getCriteriasFromObject($asset);
+        $criterias = $this->getCriteriasFromObject($asset, $this::ACTION);
 
         return $criterias;
     }
@@ -227,11 +280,11 @@ class PluginRulesRule extends Rule {
     function processRules(CommonDBTM $item, $condition = 0) {
         $criterias = $this->getCriteriasFromObject($item);
 
-        $ruleCollection = 'PluginRulesRule'.$this->getItem().'Collection';
+        $ruleCollection = 'PluginRulesRule' . $this->getItem() . 'Collection';
         $ruleCollection = new $ruleCollection();
 
         $ruleCollection->setEntity($item->input['entities_id']);
-        
+
         $fields_affected_by_rules = $ruleCollection->processAllRules(
             $item->input, array(), array(), array(
             'condition' => $condition
@@ -242,7 +295,51 @@ class PluginRulesRule extends Rule {
         unset($fields_affected_by_rules['_rule_process']);
 
         foreach ($fields_affected_by_rules as $key => $value) {
-            $item->input[$key] = $value;
+            // hack for dates
+            if ($value == "{today}") {
+                $value = date("Y-m-d");
+            }
+
+            if (isset($item->input[$key])) {
+                $item->input[$key] = $value;
+            } else {
+                // else is a foreing field
+                // parsing to extract item and field
+                list($subitem, $field) = explode("_", $key, 2);
+                // linkfield with the table
+                $linkfield = $subitem . "_id";
+                // extract the last s
+                $subitem = ucfirst(substr($subitem, 0, strlen($subitem) - 1));
+                // check for caution
+                if (class_exists($subitem)) {
+                    $subitem = new $subitem();
+                    $input = array();
+
+                    // hack for infocom
+                    if (get_class($subitem) == 'Infocom') {
+                        if (!$subitem->getFromDBByQuery("WHERE items_id = " . $item->input['id'] . " AND itemtype = '" . get_class($item) . "'")) {
+                            // new infocom
+                            $subitem->add(array(
+                                'items_id'=>$item->input['id'],
+                                'itemtype'=>get_class($item)
+                            ));
+                        }
+                        $input["id"] = $subitem->fields['id'];
+                        
+                        // hack for dates, the dates don't must change
+                        if (strstr($field, "date") and $subitem->fields[$field] != "") {
+                            continue;
+                        }
+                        
+                    } else {
+                        $input["id"] = $item->input[$linkfield];
+                    }
+                    
+                    $input[$field] = $value;
+                    $subitem->update($input);
+                }
+            }
         }
     }
+
 }
