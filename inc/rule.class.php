@@ -183,9 +183,12 @@ class PluginRulesRule extends Rule {
      */
     public function getCriteriasFromObject(CommonDBTM $object, $criteria_or_action) {
         $criterias = $object->getSearchOptions();
-        
+
         // for infocom table
         $criterias = array_merge($criterias, $this::getInfocomCriterias($object, $criteria_or_action));
+
+        // for networkport table
+        $criterias = array_merge($criterias, $this::getNetworkPortCriterias($object, $criteria_or_action));
 
         foreach ($criterias as $key => $criteria) {
             if (!is_numeric($key)) {
@@ -203,12 +206,21 @@ class PluginRulesRule extends Rule {
             if ($criteria['table'] != $object->getTable()) {
                 $sufix = "_id";
 
+                //$criteria['table'] = str_replace(" ", "", $criteria['table']);
                 // if it's foreingkey but don't dropdown
                 if ($criteria['datatype'] != 'dropdown') {
                     if ($criteria_or_action == $this::ACTION) {
                         $sufix = "_" . $criteria['field'];
                         $item = str_replace("glpi_", "", $criteria['table']);
                         $item = ucfirst(substr($item, 0, strlen($item) - 1));
+                        
+                        // hack for plural "es"
+                        if (!class_exists($item)) {
+                            $item = ucfirst(substr($item, 0, strlen($item) - 1));
+                        }
+                        
+                        $item = str_replace(" ", "", $item);
+                        
                         if (class_exists($item)) {
                             $criterias[$key]['name'] = $item::getTypeName(1) . " - " . $criterias[$key]['name'];
                         } else {
@@ -222,7 +234,6 @@ class PluginRulesRule extends Rule {
                 }
 
                 $field = $criterias[$key]['linkfield'] = str_replace("glpi_", "", $criterias[$key]['table']) . $sufix;
-                
             } else {
                 $field = $criterias[$key]['field'];
             }
@@ -244,12 +255,24 @@ class PluginRulesRule extends Rule {
      * Special item infocom for actions.
      * @param type $criteria_or_action See constants.
      */
-    static function getInfocomCriterias(CommonDBTM $object, $criteria_or_action) {
+    private static function getInfocomCriterias(CommonDBTM $object, $criteria_or_action) {
         if ($criteria_or_action == self::ACTION) {
             $infocom = new Infocom();
             return $infocom->getSearchOptionsToAdd(get_class($object));
         }
-        
+
+        return array();
+    }
+
+    /**
+     * Special item networkport for actions.
+     * @param type $criteria_or_action See constants.
+     */
+    private static function getNetworkPortCriterias(CommonDBTM $object, $criteria_or_action) {
+        if ($criteria_or_action == self::ACTION) {
+            $networkport = new NetworkPort();
+            return $networkport->getSearchOptionsToAdd(get_class($object));
+        }
         return array();
     }
 
@@ -310,6 +333,12 @@ class PluginRulesRule extends Rule {
                 $linkfield = $subitem . "_id";
                 // extract the last s
                 $subitem = ucfirst(substr($subitem, 0, strlen($subitem) - 1));
+                
+                // hack for plural "es"
+                if (!class_exists($subitem)) {
+                    $subitem = ucfirst(substr($subitem, 0, strlen($subitem) - 1));
+                }
+                
                 // check for caution
                 if (class_exists($subitem)) {
                     $subitem = new $subitem();
@@ -320,21 +349,116 @@ class PluginRulesRule extends Rule {
                         if (!$subitem->getFromDBByQuery("WHERE items_id = " . $item->input['id'] . " AND itemtype = '" . get_class($item) . "'")) {
                             // new infocom
                             $subitem->add(array(
-                                'items_id'=>$item->input['id'],
-                                'itemtype'=>get_class($item)
+                                'items_id' => $item->input['id'],
+                                'itemtype' => get_class($item)
                             ));
                         }
                         $input["id"] = $subitem->fields['id'];
-                        
+
                         // hack for dates, the dates don't must change
                         if (strstr($field, "date") and $subitem->fields[$field] != "") {
                             continue;
                         }
                         
+                    } elseif(get_class($subitem) == 'NetworkPort' 
+                        or get_class($subitem) == 'Netpoint' 
+                        or get_class($subitem) == 'IPAddress' 
+                        or get_class($subitem) == 'NetworkName'
+                        or get_class($subitem) == 'NetworkAlias'
+                        or get_class($subitem) == 'Vlan'
+                    ) {
+                        // search for interfaces
+                        $networkport = new NetworkPort();
+                        $networkports = $networkport->find("items_id = " . $item->input['id'] . " and itemtype = '" . get_class($item) . "'");
+                        foreach ($networkports as $networkport) {
+                            
+                            // instantiation of networkport to update networkname or ipaddresses
+                            $np = new NetworkPort();
+                            
+                            // update networkport
+                            if (get_class($subitem) == 'NetworkPort') {
+                                $np->update(array(
+                                    'id' => $networkport['id'],
+                                    $field => $value
+                                ));
+                            }
+                            
+                            // update netpoint
+                            if (get_class($subitem) == 'Netpoint') {
+                                $npe = new NetworkPortEthernet();
+                                $npe->update(array(
+                                    "networkports_id" => $networkport['id'],
+                                    "netpoints_id" => $value
+                                ));
+                            }
+                            
+                            // update vlans
+                            if (get_class($subitem) == 'Vlan') {
+                                $npv = new NetworkPort_Vlan();
+                                if ($value != "" and $value != "0") {
+                                    $npv->assignVlan($networkport['id'], $value, '0');
+                                } else {
+                                    foreach ($npv->getVlansForNetworkPort($networkport['id']) as $vlanid) {
+                                        $npv->unassignVlan($networkport['id'], $vlanid);
+                                    }
+                                }
+                            }
+                            
+                            // search for networkname
+                            $networkname = new NetworkName();
+                            if ($networkname->getFromDBByQuery("WHERE items_id = " . $networkport['id'] . " and itemtype = 'NetworkPort'")) {
+                                
+                                // update networkname
+                                if (get_class($subitem) == 'NetworkName') {
+                                    $networkname->fields[$field] = $value;
+                                    $np->update(array(
+                                        "_create_children" => 1,
+                                        "id" => $networkport['id'],
+                                        "NetworkName_id" => $networkname->fields['id'],
+                                        "NetworkName_name" => $networkname->fields['name'],
+                                        "NetworkName_fqdns_id" => $networkname->fields['fqdns_id']
+                                    ));
+                                }
+                                
+                                // update networkalias
+                                $na = new NetworkAlias();
+                                if (get_class($subitem) == 'NetworkAlias' 
+                                    and $aliases = $na->find("networknames_id = " . $networkname->fields['id'])
+                                ) {
+                                    foreach ($aliases as $alias) {
+                                        $na->update(array(
+                                            "id" => $alias['id'],
+                                            $field => $value
+                                        ));
+                                    }
+                                }
+                                
+                                // search for ip addresses
+                                $ipaddress = new IPAddress();
+                                if (get_class($subitem) == 'IPAddress' 
+                                    and $ips = $ipaddress->find("items_id = " . $networkname->fields['id'] . " and itemtype = 'NetworkName'")
+                                ) {
+                                    foreach ($ips as $ip) {
+                                        // if you don't specify networkname values this will be deleted
+                                        $np->update(array(
+                                            "_create_children" => 1,
+                                            "id" => $networkport['id'],
+                                            "NetworkName_id" => $networkname->fields['id'],
+                                            "NetworkName_name" => $networkname->fields['name'],
+                                            "NetworkName_fqdns_id" => $networkname->fields['fqdns_id'],
+                                            "NetworkName__ipaddresses" => array($ip['id'] => $value)
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        
+                        continue;
+                    
                     } else {
                         $input["id"] = $item->input[$linkfield];
                     }
-                    
+
                     $input[$field] = $value;
                     $subitem->update($input);
                 }

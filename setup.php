@@ -37,11 +37,12 @@ function plugin_init_rules() {
         'Peripheral',
         'NetworkEquipment',
         'Software',
-        'Infocom'
+        'Infocom',
+        'NetworkPort'
     );
     
     foreach ($assets as $asset) {
-        if (file_exists(GLPI_ROOT . "/plugins/rules/inc/rule" . strtolower($asset) . "collection.class.php")) {
+        if (file_exists(GLPI_ROOT . "/plugins/rules/inc/rule" . str_replace(" ", "", strtolower($asset)) . "collection.class.php")) {
             Plugin::registerClass(
                 'PluginRulesRule' . $asset . 'Collection', array('rulecollections_types' => true)
             );
