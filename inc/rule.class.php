@@ -189,7 +189,7 @@ class PluginRulesRule extends Rule {
 
         // for networkport table
         $criterias = array_merge($criterias, $this::getNetworkPortCriterias($object, $criteria_or_action));
-
+        
         foreach ($criterias as $key => $criteria) {
             if (!is_numeric($key)) {
                 unset($criterias[$key]);
@@ -455,6 +455,17 @@ class PluginRulesRule extends Rule {
                         
                         continue;
                     
+                    } elseif (get_class($subitem) == 'PluginFusioninventoryAgent') {
+                        // only one option: remove the agent
+                        $subitem->getFromDBByQuery("WHERE computers_id = " . $item->fields['id']);
+                        if (!empty($subitem->fields)) {
+                            $subitem->delete(
+                                array(
+                                    'id' => $subitem->fields['id']
+                                ),
+                                1
+                            );
+                        }
                     } else {
                         $input["id"] = $item->input[$linkfield];
                     }

@@ -28,4 +28,21 @@ if (!defined('GLPI_ROOT')) {
  *   - actions
  *
  * */
-class PluginRulesRuleComputer extends PluginRulesRule {}
+class PluginRulesRuleComputer extends PluginRulesRule {
+
+    /**
+     * Get the actions available for the rule
+     *
+     * @return array
+     */
+    function getActions() {
+        
+        $actions = parent::getActions();
+        
+        $actions['pluginFusioninventoryAgents_useragent']['name'] = __('FusionInventory - Delete Fusion Inventory Agent', 'rules');
+        $actions['pluginFusioninventoryAgents_useragent']['type'] = 'yesonly';
+
+        return $actions;
+    }
+
+}
