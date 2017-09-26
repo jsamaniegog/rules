@@ -27,19 +27,8 @@ function plugin_init_rules() {
 
     Plugin::registerClass('PluginRulesRule');
 
-    $assets = array(
-        'Computer',
-        'Monitor',
-        'Printer',
-        'CartridgeItem',
-        'ConsumableItem',
-        'Phone',
-        'Peripheral',
-        'NetworkEquipment',
-        'Software',
-        'Infocom',
-        'NetworkPort'
-    );
+    require_once 'inc/rule.class.php';
+    $assets = PluginRulesRule::$items;
     
     foreach ($assets as $asset) {
         if (file_exists(GLPI_ROOT . "/plugins/rules/inc/rule" . str_replace(" ", "", strtolower($asset)) . "collection.class.php")) {
@@ -56,7 +45,7 @@ function plugin_init_rules() {
     }
 
     //$PLUGIN_HOOKS['rule_matched']['rules'] = 'plugin_rule_matched_rules';
-
+    
     $PLUGIN_HOOKS['csrf_compliant']['rules'] = true;
 }
 

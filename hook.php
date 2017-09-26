@@ -33,6 +33,19 @@ function plugin_change_profile_rules() {
 function plugin_rules_install() {
     global $DB;
 
+    $time_in_seconds = 604800;
+
+    $res = CronTask::Register(
+        "PluginRulesRule", 
+        "ExecuteAllRules", 
+        $time_in_seconds, 
+        array(
+            'comment' => __('Executes all rules over all inventory.', 'rules'),
+            'mode' => CronTask::MODE_EXTERNAL,
+            'state' => CronTask::STATE_DISABLE
+        )
+    );
+
     return true;
 }
 
@@ -64,16 +77,16 @@ function plugin_pre_item_delete_rules(CommonDBTM $item) {
     $ruleitem->processRules($item, PluginRulesRule::ONDELETE);
 }
 
-/*function plugin_pre_item_purge_rules(CommonDBTM $item) {
-    $ruleitem = 'PluginRulesRule' . get_class($item);
-    $ruleitem = new $ruleitem();
-    $ruleitem->processRules($item, PluginRulesRule::ONPURGE);
-}*/
+/* function plugin_pre_item_purge_rules(CommonDBTM $item) {
+  $ruleitem = 'PluginRulesRule' . get_class($item);
+  $ruleitem = new $ruleitem();
+  $ruleitem->processRules($item, PluginRulesRule::ONPURGE);
+  } */
 
-/*function plugin_rule_matched_rules($params) {
-    $params['subtype'];
-    $params['ruleid'];
-    $params['subtype'];
-    $params['input'];
-    $params['output'];
-}*/
+/* function plugin_rule_matched_rules($params) {
+  $params['subtype'];
+  $params['ruleid'];
+  $params['subtype'];
+  $params['input'];
+  $params['output'];
+  } */

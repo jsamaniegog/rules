@@ -31,18 +31,6 @@ if (!defined('GLPI_ROOT')) {
 class PluginRulesRule extends Rule {
 
     /**
-     * If do history.
-     * @var bool 
-     */
-    public $dohistory = true;
-
-    /**
-     * Name for profile rights.
-     * @var type 
-     */
-    static $rightname = 'config';
-
-    /**
      * model attributes 
      * @var array
      */
@@ -53,12 +41,6 @@ class PluginRulesRule extends Rule {
      * @var array 
      */
     public $view_options = array();
-
-    /**
-     *
-     * @var type 
-     */
-    public $can_sort = true;
 
     /**
      * Event on add
@@ -91,6 +73,24 @@ class PluginRulesRule extends Rule {
     const ACTION = 2;
 
     /**
+     * Assets managed by rules plugin.
+     * @var type 
+     */
+    static public $items = array(
+        'Computer',
+        'Monitor',
+        'Printer',
+        'CartridgeItem',
+        'ConsumableItem',
+        'Phone',
+        'Peripheral',
+        'NetworkEquipment',
+        'Software',
+        'Infocom',
+        'NetworkPort'
+    );
+
+    /**
      * Return the asset of actual class. Based on name.
      * @return String
      */
@@ -120,7 +120,9 @@ class PluginRulesRule extends Rule {
      */
     static function getTypeName($nb = 1) {
         $asset = self::getItem();
-        return _n('Rule for ', 'Rules for ', $nb, 'rules') . $asset::getTypeName();
+        return ($asset == '') 
+            ? 'PluginRulesRule'
+            : _n('Rule for ', 'Rules for ', $nb, 'rules') . $asset::getTypeName() ;
     }
 
     function getTitle() {
@@ -189,7 +191,7 @@ class PluginRulesRule extends Rule {
 
         // for networkport table
         $criterias = array_merge($criterias, $this::getNetworkPortCriterias($object, $criteria_or_action));
-        
+
         foreach ($criterias as $key => $criteria) {
             if (!is_numeric($key)) {
                 unset($criterias[$key]);
@@ -213,14 +215,14 @@ class PluginRulesRule extends Rule {
                         $sufix = "_" . $criteria['field'];
                         $item = str_replace("glpi_", "", $criteria['table']);
                         $item = ucfirst(substr($item, 0, strlen($item) - 1));
-                        
+
                         // hack for plural "es"
                         if (!class_exists($item)) {
                             $item = ucfirst(substr($item, 0, strlen($item) - 1));
                         }
-                        
+
                         $item = str_replace(" ", "", $item);
-                        
+
                         if (class_exists($item)) {
                             $criterias[$key]['name'] = $item::getTypeName(1) . " - " . $criterias[$key]['name'];
                         } else {
@@ -299,8 +301,10 @@ class PluginRulesRule extends Rule {
     /**
      * Process rules and assign the new values to the input.
      * @param type $condition See constants.
+     * @return bool false if no rule matches
      */
     function processRules(CommonDBTM $item, $condition = 0) {
+        
         $criterias = $this->getCriteriasFromObject($item);
 
         $ruleCollection = 'PluginRulesRule' . $this->getItem() . 'Collection';
@@ -317,13 +321,17 @@ class PluginRulesRule extends Rule {
         // unnecessary variable, number of rules processed
         unset($fields_affected_by_rules['_rule_process']);
 
+        if ($fields_affected_by_rules['_no_rule_matches'] == 1) {
+            return false;
+        }
+        
         foreach ($fields_affected_by_rules as $key => $value) {
             // hack for dates
             if ($value == "{today}") {
                 $value = date("Y-m-d");
             }
 
-            if (isset($item->input[$key])) {
+            if (isset($item->fields[$key])) {
                 $item->input[$key] = $value;
             } else {
                 // else is a foreing field
@@ -333,12 +341,12 @@ class PluginRulesRule extends Rule {
                 $linkfield = $subitem . "_id";
                 // extract the last s
                 $subitem = ucfirst(substr($subitem, 0, strlen($subitem) - 1));
-                
+
                 // hack for plural "es"
                 if (!class_exists($subitem)) {
                     $subitem = ucfirst(substr($subitem, 0, strlen($subitem) - 1));
                 }
-                
+
                 // check for caution
                 if (class_exists($subitem)) {
                     $subitem = new $subitem();
@@ -359,10 +367,9 @@ class PluginRulesRule extends Rule {
                         if (strstr($field, "date") and $subitem->fields[$field] != "") {
                             continue;
                         }
-                        
-                    } elseif(get_class($subitem) == 'NetworkPort' 
-                        or get_class($subitem) == 'Netpoint' 
-                        or get_class($subitem) == 'IPAddress' 
+                    } elseif (get_class($subitem) == 'NetworkPort'
+                        or get_class($subitem) == 'Netpoint'
+                        or get_class($subitem) == 'IPAddress'
                         or get_class($subitem) == 'NetworkName'
                         or get_class($subitem) == 'NetworkAlias'
                         or get_class($subitem) == 'Vlan'
@@ -371,10 +378,10 @@ class PluginRulesRule extends Rule {
                         $networkport = new NetworkPort();
                         $networkports = $networkport->find("items_id = " . $item->input['id'] . " and itemtype = '" . get_class($item) . "'");
                         foreach ($networkports as $networkport) {
-                            
+
                             // instantiation of networkport to update networkname or ipaddresses
                             $np = new NetworkPort();
-                            
+
                             // update networkport
                             if (get_class($subitem) == 'NetworkPort') {
                                 $np->update(array(
@@ -382,7 +389,7 @@ class PluginRulesRule extends Rule {
                                     $field => $value
                                 ));
                             }
-                            
+
                             // update netpoint
                             if (get_class($subitem) == 'Netpoint') {
                                 $npe = new NetworkPortEthernet();
@@ -391,7 +398,7 @@ class PluginRulesRule extends Rule {
                                     "netpoints_id" => $value
                                 ));
                             }
-                            
+
                             // update vlans
                             if (get_class($subitem) == 'Vlan') {
                                 $npv = new NetworkPort_Vlan();
@@ -403,11 +410,11 @@ class PluginRulesRule extends Rule {
                                     }
                                 }
                             }
-                            
+
                             // search for networkname
                             $networkname = new NetworkName();
                             if ($networkname->getFromDBByQuery("WHERE items_id = " . $networkport['id'] . " and itemtype = 'NetworkPort'")) {
-                                
+
                                 // update networkname
                                 if (get_class($subitem) == 'NetworkName') {
                                     $networkname->fields[$field] = $value;
@@ -419,10 +426,10 @@ class PluginRulesRule extends Rule {
                                         "NetworkName_fqdns_id" => $networkname->fields['fqdns_id']
                                     ));
                                 }
-                                
+
                                 // update networkalias
                                 $na = new NetworkAlias();
-                                if (get_class($subitem) == 'NetworkAlias' 
+                                if (get_class($subitem) == 'NetworkAlias'
                                     and $aliases = $na->find("networknames_id = " . $networkname->fields['id'])
                                 ) {
                                     foreach ($aliases as $alias) {
@@ -432,10 +439,10 @@ class PluginRulesRule extends Rule {
                                         ));
                                     }
                                 }
-                                
+
                                 // search for ip addresses
                                 $ipaddress = new IPAddress();
-                                if (get_class($subitem) == 'IPAddress' 
+                                if (get_class($subitem) == 'IPAddress'
                                     and $ips = $ipaddress->find("items_id = " . $networkname->fields['id'] . " and itemtype = 'NetworkName'")
                                 ) {
                                     foreach ($ips as $ip) {
@@ -452,18 +459,16 @@ class PluginRulesRule extends Rule {
                                 }
                             }
                         }
-                        
+
                         continue;
-                    
                     } elseif (get_class($subitem) == 'PluginFusioninventoryAgent') {
                         // only one option: remove the agent
                         $subitem->getFromDBByQuery("WHERE computers_id = " . $item->fields['id']);
                         if (!empty($subitem->fields)) {
                             $subitem->delete(
                                 array(
-                                    'id' => $subitem->fields['id']
-                                ),
-                                1
+                                'id' => $subitem->fields['id']
+                                ), 1
                             );
                         }
                     } else {
@@ -475,6 +480,41 @@ class PluginRulesRule extends Rule {
                 }
             }
         }
+        
+        return true;
     }
-
+    
+    /**
+     * Executed by cron. This task search items that matches the rules and
+     * execute them. Only for update event, add and delete event not.
+     */
+    static function cronExecuteAllRules(CronTask $task) {
+        $items = self::$items;
+        
+        foreach ($items as $item) {
+            $item = new $item();
+            
+            $records = $item->find("is_deleted = 0");
+            self::processRecords($item, $records);
+        }
+    }
+    
+    /**
+     * 
+     * @param object $item Item of GLPI.
+     * @param array $records Array for records.
+     * @param type $event Event: see constants of PluginRulesRule.
+     */
+    static private function processRecords($item, $records, $event = PluginRulesRule::ONUPDATE) {
+        foreach ($records as $record) {
+            $item->fields = $record;
+            $item->input = $record;
+            
+            $ruleitem = 'PluginRulesRule' . get_class($item);
+            $ruleitem = new $ruleitem();
+            if ($ruleitem->processRules($item, $event) != false) {
+                $item->update($item->input);
+            }
+        }
+    }
 }
