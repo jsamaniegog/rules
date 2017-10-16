@@ -55,7 +55,7 @@ function plugin_init_rules() {
  */
 function plugin_version_rules() {
     return array('name' => __('Rules', 'rules'),
-        'version' => '0.1.0',
+        'version' => '0.1.1',
         'author' => 'Javier Samaniego',
         'license' => 'AGPLv3+',
         'homepage' => 'https://github.com/jsamaniegog/rules',

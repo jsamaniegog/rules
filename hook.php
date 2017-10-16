@@ -40,7 +40,7 @@ function plugin_rules_install() {
         "ExecuteAllRules", 
         $time_in_seconds, 
         array(
-            'comment' => __('Executes all rules over all inventory.', 'rules'),
+            'comment' => __('Executes all rules over all inventory. This task only must be executed as an exception when you want modify all the inventory with the configured rules. You should desactivate this rule after the use.', 'rules'),
             'mode' => CronTask::MODE_EXTERNAL,
             'state' => CronTask::STATE_DISABLE
         )
