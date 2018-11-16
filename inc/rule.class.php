@@ -184,7 +184,7 @@ class PluginRulesRule extends Rule {
      * @return string
      */
     public function getCriteriasFromObject(CommonDBTM $object, $criteria_or_action) {
-        $criterias = $object->getSearchOptions();
+        $criterias = $object->rawSearchOptions();
 
         // for infocom table
         $criterias = array_merge($criterias, $this::getInfocomCriterias($object, $criteria_or_action));

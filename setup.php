@@ -55,11 +55,11 @@ function plugin_init_rules() {
  */
 function plugin_version_rules() {
     return array('name' => __('Rules', 'rules'),
-        'version' => '0.1.1',
+        'version' => '0.2.0',
         'author' => 'Javier Samaniego',
         'license' => 'AGPLv3+',
         'homepage' => 'https://github.com/jsamaniegog/rules',
-        'minGlpiVersion' => '9.1');
+        'minGlpiVersion' => '9.3');
 }
 
 /**
@@ -67,8 +67,8 @@ function plugin_version_rules() {
  * @return boolean
  */
 function plugin_rules_check_prerequisites() {
-    if (version_compare(GLPI_VERSION, '9.1', 'lt')) {
-        _e('This plugin requires GLPI >= 9.1', 'rules');
+    if (version_compare(GLPI_VERSION, '9.3', 'lt')) {
+        _e('This plugin requires GLPI >= 9.3', 'rules');
         return false;
     }
 
