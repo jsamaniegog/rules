@@ -305,7 +305,7 @@ class PluginRulesRule extends Rule {
      */
     function processRules(CommonDBTM $item, $condition = 0) {
         
-        $criterias = $this->getCriteriasFromObject($item);
+        $criterias = $this->getCriteriasFromObject($item, $this::ACTION);
 
         $ruleCollection = 'PluginRulesRule' . $this->getItem() . 'Collection';
         $ruleCollection = new $ruleCollection();
@@ -354,7 +354,7 @@ class PluginRulesRule extends Rule {
 
                     // hack for infocom
                     if (get_class($subitem) == 'Infocom') {
-                        if (!$subitem->getFromDBByQuery("WHERE items_id = " . $item->input['id'] . " AND itemtype = '" . get_class($item) . "'")) {
+                        if (!$subitem->getFromDB("WHERE items_id = " . $item->input['id'] . " AND itemtype = '" . get_class($item) . "'")) {
                             // new infocom
                             $subitem->add(array(
                                 'items_id' => $item->input['id'],
@@ -413,7 +413,7 @@ class PluginRulesRule extends Rule {
 
                             // search for networkname
                             $networkname = new NetworkName();
-                            if ($networkname->getFromDBByQuery("WHERE items_id = " . $networkport['id'] . " and itemtype = 'NetworkPort'")) {
+                            if ($networkname->getFromDB("WHERE items_id = " . $networkport['id'] . " and itemtype = 'NetworkPort'")) {
 
                                 // update networkname
                                 if (get_class($subitem) == 'NetworkName') {
@@ -463,7 +463,7 @@ class PluginRulesRule extends Rule {
                         continue;
                     } elseif (get_class($subitem) == 'PluginFusioninventoryAgent') {
                         // only one option: remove the agent
-                        $subitem->getFromDBByQuery("WHERE computers_id = " . $item->fields['id']);
+                        $subitem->getFromDB("WHERE computers_id = " . $item->fields['id']);
                         if (!empty($subitem->fields)) {
                             $subitem->delete(
                                 array(

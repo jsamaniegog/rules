@@ -59,7 +59,7 @@ function plugin_version_rules() {
         'author' => 'Javier Samaniego',
         'license' => 'AGPLv3+',
         'homepage' => 'https://github.com/jsamaniegog/rules',
-        'minGlpiVersion' => '9.3');
+        'minGlpiVersion' => '9.4');
 }
 
 /**
@@ -67,8 +67,8 @@ function plugin_version_rules() {
  * @return boolean
  */
 function plugin_rules_check_prerequisites() {
-    if (version_compare(GLPI_VERSION, '9.3', 'lt')) {
-        _e('This plugin requires GLPI >= 9.3', 'rules');
+    if (version_compare(GLPI_VERSION, '9.4', 'lt')) {
+        _e('This plugin requires GLPI >= 9.4', 'rules');
         return false;
     }
 
